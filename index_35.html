@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>遺産分割協議書 作成ツール</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    /* ─── Design tokens ──────────────────────────────────────────── */
+    :root {
+      --bg:           #f2f1ed;
+      --surface:      #ffffff;
+      --surface-2:    #edecea;
+      --border:       #d8d5cf;
+      --border-focus: #1d4680;
+      --text:         #1b2a3b;
+      --text-muted:   #5a6676;
+      --text-subtle:  #8a96a4;
+      --accent:       #1d4680;
+      --accent-h:     #163560;
+      --accent-tint:  #e5ecf8;
+      --green:        #1a5c3a;
+      --green-h:      #134a2d;
+      --red:          #8b2635;
+      --shadow-card:  0 1px 4px rgba(27,42,59,0.07), 0 1px 2px rgba(27,42,59,0.04);
+      --shadow-panel: 0 2px 12px rgba(27,42,59,0.09);
+      --doc-bg:       #ffffff;
+      --doc-text:     #111111;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg:           #0e1620;
+        --surface:      #172030;
+        --surface-2:    #1c2840;
+        --border:       #273a52;
+        --border-focus: #5d8fd6;
+        --text:         #ddd8ce;
+        --text-muted:   #8a9db5;
+        --text-subtle:  #6a7e96;
+        --accent:       #4f7ec8;
+        --accent-h:     #6592d8;
+        --accent-tint:  #1a2d50;
+        --green:        #2e7d52;
+        --green-h:      #3a9d66;
+        --red:          #c0425a;
+        --shadow-card:  0 1px 4px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+        --shadow-panel: 0 2px 12px rgba(0,0,0,0.4);
+        --doc-bg:       #f6f5f1;
+        --doc-text:     #111111;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg:           #0e1620;
+      --surface:      #172030;
+      --surface-2:    #1c2840;
+      --border:       #273a52;
+      --border-focus: #5d8fd6;
+      --text:         #ddd8ce;
+      --text-muted:   #8a9db5;
+      --text-subtle:  #6a7e96;
+      --accent:       #4f7ec8;
+      --accent-h:     #6592d8;
+      --accent-tint:  #1a2d50;
+      --green:        #2e7d52;
+      --green-h:      #3a9d66;
+      --red:          #c0425a;
+      --shadow-card:  0 1px 4px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --shadow-panel: 0 2px 12px rgba(0,0,0,0.4);
+      --doc-bg:       #f6f5f1;
+      --doc-text:     #111111;
+    }
+
+    /* ─── Base ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans JP', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Header ─────────────────────────────────────────────────── */
+    .app-header {
+      background: var(--accent);
+      color: #fff;
+      padding: 0 1.5rem;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: sticky;
+      top: env(safe-area-inset-top, 0px);
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .header-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .header-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 3px;
+      padding: 0.1rem 0.45rem;
+      text-transform: uppercase;
+    }
+
+    .header-actions { display: flex; gap: 0.5rem; }
+
+    .btn-head {
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.35rem 0.85rem;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-head:hover { background: rgba(255,255,255,0.22); }
+
+    .btn-head-green {
+      background: var(--green);
+      border-color: transparent;
+    }
+    .btn-head-green:hover { background: var(--green-h); }
+
+    /* ─── Main layout ────────────────────────────────────────────── */
+    .app-main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ─── Form panel ─────────────────────────────────────────────── */
+    .form-panel {
+      background: var(--surface);
+      border-radius: 8px;
+      box-shadow: var(--shadow-panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .form-scroll {
+      overflow-y: auto;
+      padding: 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* ─── Sections ───────────────────────────────────────────────── */
+    .form-section {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+    }
+    .form-section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .section-hd {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.875rem;
+    }
+
+    .section-hd-left { display: flex; align-items: baseline; gap: 0.6rem; }
+
+    .section-num {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .section-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* ─── Form fields ────────────────────────────────────────────── */
+    .field-row { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    .field-grid-2 .span2 { grid-column: 1 / -1; }
+
+    .field-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 0.42rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      appearance: none;
+    }
+
+    .field-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-tint);
+    }
+
+    textarea.field-input {
+      resize: vertical;
+      min-height: 58px;
+      line-height: 1.5;
+    }
+
+    /* ─── Radio toggle ───────────────────────────────────────────── */
+    .radio-group { display: flex; gap: 0; }
+    .radio-option { flex: 1; }
+    .radio-option input[type="radio"] { display: none; }
+
+    .radio-option label {
+      display: block;
+      padding: 0.45rem 0.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      transition: all 0.15s;
+      background: var(--surface-2);
+    }
+
+    .radio-option:first-child label { border-radius: 5px 0 0 5px; }
+    .radio-option:last-child label  { border-radius: 0 5px 5px 0; border-left: none; }
+
+    .radio-option input[type="radio"]:checked + label {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ─── Buttons ────────────────────────────────────────────────── */
+    .btn-sm {
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.28rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-sm:hover { background: var(--border); }
+
+    .btn-danger {
+      background: transparent;
+      border: none;
+      color: var(--red);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.2rem 0.4rem;
+      font-family: inherit;
+      border-radius: 3px;
+    }
+    .btn-danger:hover { background: rgba(139,38,53,0.08); }
+
+    .btn-pdf {
+      font-family: inherit;
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 0.28rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px dashed var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .btn-pdf:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-tint);
+    }
+
+    /* ─── Asset cards ────────────────────────────────────────────── */
+    .asset-stack { display: flex; flex-direction: column; gap: 0.65rem; }
+
+    .asset-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .asset-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .asset-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      padding: 0.15rem 0.55rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .badge-bank        { background: #dbeafe; color: #1e3a8a; }
+    .badge-car         { background: #d1fae5; color: #065f46; }
+    .badge-realestate  { background: #fef3c7; color: #854d0e; }
+    .badge-securities  { background: #ede9fe; color: #4c1d95; }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .badge-bank       { background: #1a3060; color: #93c5fd; }
+      :root:not([data-theme="light"]) .badge-car        { background: #053d2b; color: #6ee7b7; }
+      :root:not([data-theme="light"]) .badge-realestate { background: #6b3810; color: #fcd34d; }
+      :root:not([data-theme="light"]) .badge-securities { background: #2e1b6e; color: #c4b5fd; }
+    }
+    :root[data-theme="dark"] .badge-bank       { background: #1a3060; color: #93c5fd; }
+    :root[data-theme="dark"] .badge-car        { background: #053d2b; color: #6ee7b7; }
+    :root[data-theme="dark"] .badge-realestate { background: #6b3810; color: #fcd34d; }
+    :root[data-theme="dark"] .badge-securities { background: #2e1b6e; color: #c4b5fd; }
+
+    .asset-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+
+    /* ─── Heir rows ──────────────────────────────────────────────── */
+    .heir-stack { display: flex; flex-direction: column; gap: 0.45rem; }
+
+    .heir-row {
+      display: grid;
+      grid-template-columns: 1fr 0.65fr auto;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    /* ─── Checkboxes ─────────────────────────────────────────────── */
+    .check-stack { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .check-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.79rem;
+      color: var(--text);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+
+    .check-row input[type="checkbox"] {
+      margin-top: 0.18rem;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ─── Add asset buttons ──────────────────────────────────────── */
+    .add-asset-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    /* ─── Preview panel ──────────────────────────────────────────── */
+    .preview-panel {
+      overflow-y: auto;
+      padding: 0.5rem;
+      background: var(--surface-2);
+      border-radius: 8px;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.06);
+      min-height: 0;
+    }
+
+    .a4-page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 22mm 20mm 20mm;
+      margin: 0 auto;
+      background: var(--doc-bg);
+      color: var(--doc-text);
+      box-shadow: 0 3px 16px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1);
+      font-family: 'Noto Serif JP', 'Yu Mincho', 'ヒラギノ明朝 ProN', serif;
+      font-size: 10.5pt;
+      line-height: 1.95;
+      border-radius: 2px;
+    }
+
+    /* ─── Document internals ─────────────────────────────────────── */
+    .doc-title {
+      text-align: center;
+      font-size: 16pt;
+      font-weight: 700;
+      letter-spacing: 0.35em;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #1a1a1a;
+    }
+
+    .doc-section-title {
+      font-weight: 700;
+      border-bottom: 1px solid #555;
+      padding-bottom: 0.2rem;
+      margin-bottom: 0.6rem;
+      font-size: 10.5pt;
+    }
+
+    .doc-kv-table { width: 100%; font-size: 10pt; border-collapse: collapse; }
+    .doc-kv-table td { padding: 0.15rem 0; vertical-align: top; }
+    .doc-kv-table td:first-child { width: 6rem; white-space: nowrap; }
+
+    .doc-article { margin-bottom: 1.2rem; }
+    .doc-article-title { font-weight: 700; margin-bottom: 0.2rem; }
+    .doc-article-body { padding-left: 1.2rem; font-size: 10pt; }
+
+    .doc-outro { margin-top: 1.5rem; margin-bottom: 1.2rem; }
+    .doc-date  { margin-bottom: 1.8rem; }
+
+    .doc-heir {
+      border-top: 1px solid #ccc;
+      padding-top: 0.8rem;
+      margin-top: 0.8rem;
+      font-size: 10pt;
+    }
+
+    .doc-heir-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .doc-heir-info { line-height: 1.9; }
+    .doc-seals { display: flex; gap: 0.5rem; }
+
+    .doc-seal {
+      width: 46px;
+      height: 46px;
+      border: 1px dashed #aaa;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7pt;
+      color: #aaa;
+      flex-shrink: 0;
+    }
+
+    /* ─── Print ──────────────────────────────────────────────────── */
+    @media print {
+      body * { visibility: hidden; }
+      #preview-area, #preview-area * { visibility: visible; }
+      #preview-area {
+        position: absolute; left: 0; top: 0;
+        width: 100%; box-shadow: none;
+        padding: 0; margin: 0;
+      }
+      .no-print { display: none !important; }
+    }
+
+    /* ─── Responsive ─────────────────────────────────────────────── */
+    @media (max-width: 1023px) {
+      .app-main {
+        grid-template-columns: 1fr;
+        overflow: visible;
+        height: auto;
+      }
+      .form-panel { max-height: 65vh; }
+      .preview-panel { overflow: visible; }
+      .a4-page { width: 100%; min-height: auto; padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Header ────────────────────────────────────────────── -->
+  <header class="app-header no-print">
+    <div class="header-title">
+      <span class="header-badge">Legal</span>
+      遺産分割協議書 / 協議証明書　自動作成ツール
+    </div>
+    <div class="header-actions">
+      <button class="btn-head" onclick="window.print()">🖨 印刷・PDF出力</button>
+      <button class="btn-head btn-head-green" onclick="generateWord()">📄 Word (.docx) 出力</button>
+    </div>
+  </header>
+
+  <!-- ─── Main ──────────────────────────────────────────────── -->
+  <main class="app-main" id="app-main">
+
+    <!-- 左：入力フォーム -->
+    <div class="form-panel no-print">
+      <div class="form-scroll">
+
+        <!-- Step 01 書式選択 -->
+        <div class="form-section">
+          <div class="section-hd">
+            <div class="section-hd-left">
+              <span class="section-num">Step 01</span>
+              <span class="section-title">書式種類</span>
+            </div>
+          </div>
+          <div class="radio-group">
+            <div class="radio-option">
+              <input type="radio" id="type-kyogi" name="docType" value="協議書" checked onchange="updatePreview()">
+              <label for="type-kyogi">遺産分割協議書</label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="type-shomei" name="docType" value="協議証明書" onchange="updatePreview()">
+              <label for="type-shomei">遺産分割協議証明書</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 02 被相続人 -->
+        <div class="form-section">
+          <div class="section-hd">
+            <div class="section-hd-left">
+              <span class="section-num">Step 02</span>
+              <span class="section-title">被相続人の情報</span>
+            </div>
+            <label class="btn-pdf" title="法定相続情報PDFを読み込み">
+              📋 PDF読込
+              <input type="file" id="pdfInput" accept="application/pdf" onchange="handlePDFUpload(event)" style="display:none">
+            </label>
+          </div>
+          <div class="field-grid-2">
+            <div class="field-row">
+              <label class="field-label" for="deceasedName">氏名</label>
+              <input class="field-input" id="deceasedName" type="text" placeholder="山田 太郎" oninput="updatePreview()">
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="deceasedHonseki">本籍</label>
+              <input class="field-input" id="deceasedHonseki" type="text" placeholder="東京都千代田区…" oninput="updatePreview()">
+            </div>
+            <div class="field-row span2">
+              <label class="field-label" for="deceasedAddress">最後の住所</label>
+              <input class="field-input" id="deceasedAddress" type="text" placeholder="名古屋市熱田区…" oninput="updatePreview()">
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="deceasedDob">生年月日</label>
+              <input class="field-input" id="deceasedDob" type="text" placeholder="昭和○年○月○日" oninput="updatePreview()">
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="deceasedDod">死亡年月日</label>
+              <input class="field-input" id="deceasedDod" type="text" placeholder="令和○年○月○日" oninput="updatePreview()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 03 相続財産 -->
+        <div class="form-section">
+          <div class="section-hd">
+            <div class="section-hd-left">
+              <span class="section-num">Step 03</span>
+              <span class="section-title">相続財産</span>
+            </div>
+          </div>
+          <div class="add-asset-row" style="margin-bottom:0.75rem;">
+            <button class="btn-sm" onclick="addAsset('bank')">＋ 預貯金</button>
+            <button class="btn-sm" onclick="addAsset('car')">＋ 自動車</button>
+            <button class="btn-sm" onclick="addAsset('realestate')">＋ 不動産</button>
+            <button class="btn-sm" onclick="addAsset('securities')">＋ 有価証券</button>
+          </div>
+          <div class="asset-stack" id="assetList"></div>
+        </div>
+
+        <!-- Step 04 定型条項 -->
+        <div class="form-section">
+          <div class="section-hd">
+            <div class="section-hd-left">
+              <span class="section-num">Step 04</span>
+              <span class="section-title">特約・定型条項</span>
+            </div>
+          </div>
+          <div class="check-stack">
+            <label class="check-row">
+              <input type="checkbox" id="includeUnknownAsset" checked onchange="updatePreview()">
+              <span>未記載の遺産・負債が発見された場合、別途協議する旨の条項を含める</span>
+            </label>
+            <label class="check-row">
+              <input type="checkbox" id="includePostMortemCost" checked onchange="updatePreview()">
+              <span>死後事務費用（葬儀・遺品整理等）を均等負担する旨の条項を含める</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Step 05 日付・相続人 -->
+        <div class="form-section">
+          <div class="section-hd">
+            <div class="section-hd-left">
+              <span class="section-num">Step 05</span>
+              <span class="section-title">協議年月日・相続人</span>
+            </div>
+            <button class="btn-sm" onclick="addHeir()">＋ 相続人を追加</button>
+          </div>
+          <div class="field-row" style="margin-bottom:0.75rem;">
+            <label class="field-label" for="agreementDate">協議成立日</label>
+            <input class="field-input" id="agreementDate" type="text" value="令和　　年　　月　　日" oninput="updatePreview()">
+          </div>
+          <div class="heir-stack" id="heirList"></div>
+        </div>
+
+      </div><!-- /form-scroll -->
+    </div><!-- /form-panel -->
+
+    <!-- 右：プレビュー -->
+    <div class="preview-panel">
+      <div id="preview-area" class="a4-page">
+        <!-- JS でリアルタイム描画 -->
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    /* ─── State ──────────────────────────────────────────────────── */
+    let assets = [];
+    let heirs  = [{ name: '', address: '' }];
+
+    /* ─── Init ───────────────────────────────────────────────────── */
+    window.onload = () => {
+      addAsset('bank');
+      renderHeirInputs();
+      updatePreview();
+    };
+
+    /* ─── Assets ─────────────────────────────────────────────────── */
+    function addAsset(type) {
+      const id = Date.now();
+      assets.push({ id, type, heirName: '', details: {} });
+      renderAssetInputs();
+      updatePreview();
+    }
+
+    function removeAsset(id) {
+      assets = assets.filter(a => a.id !== id);
+      renderAssetInputs();
+      updatePreview();
+    }
+
+    function renderAssetInputs() {
+      const container = document.getElementById('assetList');
+      container.innerHTML = '';
+
+      assets.forEach(asset => {
+        const div = document.createElement('div');
+        div.className = 'asset-card';
+
+        const badgeClass = {
+          bank: 'badge-bank', car: 'badge-car',
+          realestate: 'badge-realestate', securities: 'badge-securities'
+        }[asset.type] || 'badge-bank';
+
+        const badgeLabel = {
+          bank: '預貯金', car: '自動車',
+          realestate: '不動産', securities: '有価証券'
+        }[asset.type] || asset.type;
+
+        let bodyHtml = '';
+
+        if (asset.type === 'bank') {
+          bodyHtml = `
+            <div class="field-row">
+              <label class="field-label">取得する相続人氏名</label>
+              <input type="text" class="field-input" placeholder="山田 一郎"
+                oninput="updateAsset(${asset.id},'heirName',this.value)"
+                value="${esc(asset.heirName)}">
+            </div>
+            <div class="field-row">
+              <label class="field-label">口座情報</label>
+              <input type="text" class="field-input" placeholder="○○銀行 ○○支店 普通 口座番号：1234567"
+                oninput="updateAsset(${asset.id},'details.info',this.value)"
+                value="${esc(asset.details.info||'')}">
+            </div>
+            <div class="field-row">
+              <label class="field-label">端数取得者（任意）</label>
+              <input type="text" class="field-input" placeholder="端数が出た場合に取得する相続人氏名"
+                oninput="updateAsset(${asset.id},'details.fractionHeir',this.value)"
+                value="${esc(asset.details.fractionHeir||'')}">
+            </div>
+          `;
+        } else if (asset.type === 'car') {
+          bodyHtml = `
+            <div class="field-row">
+              <label class="field-label">取得する相続人氏名</label>
+              <input type="text" class="field-input" placeholder="山田 一郎"
+                oninput="updateAsset(${asset.id},'heirName',this.value)"
+                value="${esc(asset.heirName)}">
+            </div>
+            <div class="asset-grid2">
+              <div class="field-row">
+                <label class="field-label">登録番号</label>
+                <input type="text" class="field-input" placeholder="名古屋300あ○○○○"
+                  oninput="updateAsset(${asset.id},'details.regNo',this.value)"
+                  value="${esc(asset.details.regNo||'')}">
+              </div>
+              <div class="field-row">
+                <label class="field-label">車台番号</label>
+                <input type="text" class="field-input" placeholder="ABC123DE456789"
+                  oninput="updateAsset(${asset.id},'details.vin',this.value)"
+                  value="${esc(asset.details.vin||'')}">
+              </div>
+            </div>
+          `;
+        } else if (asset.type === 'realestate') {
+          bodyHtml = `
+            <div class="field-row">
+              <label class="field-label">取得する相続人氏名</label>
+              <input type="text" class="field-input" placeholder="山田 一郎"
+                oninput="updateAsset(${asset.id},'heirName',this.value)"
+                value="${esc(asset.heirName)}">
+            </div>
+            <div class="field-row">
+              <label class="field-label">不動産の表示（所在・地番・地目・地積・家屋番号等）</label>
+              <textarea class="field-input" placeholder="所在 名古屋市熱田区…&#10;地番 ○番○号&#10;地目 宅地&#10;地積 ○○.○○㎡"
+                oninput="updateAsset(${asset.id},'details.info',this.value)">${esc(asset.details.info||'')}</textarea>
+            </div>
+          `;
+        } else if (asset.type === 'securities') {
+          bodyHtml = `
+            <div class="field-row">
+              <label class="field-label">取得する相続人氏名</label>
+              <input type="text" class="field-input" placeholder="山田 一郎"
+                oninput="updateAsset(${asset.id},'heirName',this.value)"
+                value="${esc(asset.heirName)}">
+            </div>
+            <div class="field-row">
+              <label class="field-label">有価証券の表示（証券会社・銘柄・株数等）</label>
+              <textarea class="field-input" placeholder="○○証券株式会社&#10;銘柄：△△株式会社 普通株式 ○○株&#10;預り金：金○○○○円"
+                oninput="updateAsset(${asset.id},'details.info',this.value)">${esc(asset.details.info||'')}</textarea>
+            </div>
+          `;
+        }
+
+        div.innerHTML = `
+          <div class="asset-card-top">
+            <span class="asset-badge ${badgeClass}">${badgeLabel}</span>
+            <button class="btn-danger" onclick="removeAsset(${asset.id})">削除</button>
+          </div>
+          ${bodyHtml}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function updateAsset(id, path, value) {
+      const asset = assets.find(a => a.id === id);
+      if (!asset) return;
+      if (path.startsWith('details.')) {
+        asset.details[path.slice(8)] = value;
+      } else {
+        asset[path] = value;
+      }
+      updatePreview();
+    }
+
+    /* ─── Heirs ──────────────────────────────────────────────────── */
+    function addHeir() {
+      heirs.push({ name: '', address: '' });
+      renderHeirInputs();
+      updatePreview();
+    }
+
+    function removeHeir(index) {
+      heirs.splice(index, 1);
+      renderHeirInputs();
+      updatePreview();
+    }
+
+    function renderHeirInputs() {
+      const container = document.getElementById('heirList');
+      container.innerHTML = '';
+      heirs.forEach((heir, i) => {
+        const div = document.createElement('div');
+        div.className = 'heir-row';
+        div.innerHTML = `
+          <input type="text" class="field-input" placeholder="住所"
+            value="${esc(heir.address)}"
+            oninput="heirs[${i}].address=this.value; updatePreview();">
+          <input type="text" class="field-input" placeholder="氏名"
+            value="${esc(heir.name)}"
+            oninput="heirs[${i}].name=this.value; updatePreview();">
+          ${heirs.length > 1
+            ? `<button class="btn-danger" onclick="removeHeir(${i})">✕</button>`
+            : `<span></span>`}
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    /* ─── Helpers ────────────────────────────────────────────────── */
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function blank(val, fallback = '　　　　　　　　') {
+      return (val || '').trim() ? val : fallback;
+    }
+
+    function getAssetTypeName(type) {
+      return { bank:'預貯金', car:'自動車', realestate:'不動産', securities:'有価証券' }[type] || '財産';
+    }
+
+    /* ─── Preview ────────────────────────────────────────────────── */
+    function updatePreview() {
+      const docType  = document.querySelector('input[name="docType"]:checked').value;
+      const isShomei = docType === '協議証明書';
+      const titleText = isShomei
+        ? '遺　産　分　割　協　議　証　明　書'
+        : '遺　産　分　割　協　議　書';
+
+      const name    = blank(document.getElementById('deceasedName').value,    '　　　　　　');
+      const honseki = blank(document.getElementById('deceasedHonseki').value);
+      const addr    = blank(document.getElementById('deceasedAddress').value);
+      const dob     = blank(document.getElementById('deceasedDob').value,     '　　　　　　　　');
+      const dod     = blank(document.getElementById('deceasedDod').value,     '　　　　　　　　');
+      const date    = blank(document.getElementById('agreementDate').value,   '令和　　年　　月　　日');
+
+      let html = `<div class="doc-title">${titleText}</div>`;
+
+      /* 被相続人 */
+      html += `
+        <div style="margin-bottom:1.4rem;">
+          <div class="doc-section-title">被相続人の表示</div>
+          <table class="doc-kv-table">
+            <tr><td>氏　名</td><td>：　${name}</td></tr>
+            <tr><td>本　籍</td><td>：　${honseki}</td></tr>
+            <tr><td>最後の住所</td><td>：　${addr}</td></tr>
+            <tr><td>生年月日</td><td>：　${dob}</td></tr>
+            <tr><td>死亡年月日</td><td>：　${dod}</td></tr>
+          </table>
+        </div>
+      `;
+
+      /* 前文 */
+      const maebun = isShomei
+        ? `私（証明人）は、被相続人の遺産について相続人全員による協議を行った結果、次のとおり分割することに同意したことを証明します。`
+        : `上記の者の相続人全員は、被相続人の遺産について協議を行った結果、次のとおり分割することに合意した。`;
+      html += `<p style="margin-bottom:1.2rem;">${maebun}</p>`;
+
+      /* 財産条項 */
+      let n = 1;
+      assets.forEach(asset => {
+        const heirName = (asset.heirName || '').trim() || '　　　　　　';
+        const typeName = getAssetTypeName(asset.type);
+        html += `<div class="doc-article">`;
+        html += `<div class="doc-article-title">第${n}条　相続人 ${heirName} は、次の${typeName}を取得する。</div>`;
+        html += `<div class="doc-article-body">`;
+
+        if (asset.type === 'bank') {
+          html += `<div>${(asset.details.info||'').trim() || '　（口座情報）　'}</div>`;
+          if ((asset.details.fractionHeir||'').trim()) {
+            html += `<div style="margin-top:0.3rem;">※　預貯金の分割の際に端数が生じた場合は、相続人 ${asset.details.fractionHeir} が取得する。</div>`;
+          }
+        } else if (asset.type === 'car') {
+          const reg = (asset.details.regNo||'').trim() || '　　　　　';
+          const vin = (asset.details.vin||'').trim() || '　　　　　';
+          html += `<div>登録番号　${reg}<br>車台番号　${vin}</div>`;
+        } else {
+          const info = (asset.details.info||'').trim() || '　（不動産・有価証券等の表示）';
+          html += `<div style="white-space:pre-wrap;">${info}</div>`;
+        }
+
+        html += `</div></div>`;
+        n++;
+      });
+
+      /* 後日発見条項 */
+      if (document.getElementById('includeUnknownAsset').checked) {
+        html += `<div class="doc-article"><p>第${n}条　後日、本協議書に記載のない新たな遺産（負債を含む。）が発見された場合には、当該遺産の分割について別途協議するものとする。</p></div>`;
+        n++;
+      }
+
+      /* 死後事務費用条項 */
+      if (document.getElementById('includePostMortemCost').checked) {
+        html += `<div class="doc-article"><p>第${n}条　相続人全員は、被相続人に係る死後事務費用（葬儀費用・遺品整理費用・賃借物件の退去費用・専門家報酬・交通費等を含む。）について均等に負担する旨合意した。</p></div>`;
+      }
+
+      /* 結語 */
+      const ketsugu = isShomei
+        ? `以上のとおり、被相続人の遺産分割協議が成立したことに相違ないことを証明するため、本書を作成し署名捺印します。`
+        : `以上のとおり、相続人全員による遺産分割協議が成立したので、本書を作成し各自署名捺印する。`;
+      html += `<p class="doc-outro">${ketsugu}</p>`;
+
+      /* 日付 */
+      html += `<p class="doc-date">${date}</p>`;
+
+      /* 署名欄 */
+      heirs.forEach(heir => {
+        const n2 = (heir.name||'').trim()    || '　　　　　　';
+        const a2 = (heir.address||'').trim() || '　　　　　　　　　　　　　　';
+        html += `
+          <div class="doc-heir">
+            <div class="doc-heir-row">
+              <div class="doc-heir-info">
+                <div>住　所　${a2}</div>
+                <div>氏　名　${n2}　　印</div>
+              </div>
+              <div class="doc-seals">
+                <div class="doc-seal">実印</div>
+                <div class="doc-seal">捨印</div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      document.getElementById('preview-area').innerHTML = html;
+    }
+
+    /* ─── PDF upload ─────────────────────────────────────────────── */
+    async function handlePDFUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const fileReader = new FileReader();
+      fileReader.onload = async function () {
+        try {
+          const typedarray = new Uint8Array(this.result);
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          const pdf = await pdfjsLib.getDocument(typedarray).promise;
+          let fullText = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            fullText += textContent.items.map(item => item.str).join(' ');
+          }
+          alert('PDFを読み込みました。必要に応じてフォームに情報を転記してください。\n\n抽出テキスト（先頭500字）:\n' + fullText.slice(0, 500));
+        } catch (e) {
+          alert('PDF読込中にエラーが発生しました: ' + e.message);
+        }
+      };
+      fileReader.readAsArrayBuffer(file);
+    }
+
+    /* ─── Word (.docx) 出力 ──────────────────────────────────────── */
+    function generateWord() {
+      if (typeof docx === 'undefined') {
+        alert('docxライブラリの読み込みが完了していません。しばらくお待ちください。');
+        return;
+      }
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+      const docType  = document.querySelector('input[name="docType"]:checked').value;
+      const isShomei = docType === '協議証明書';
+      const titleText = isShomei ? '遺産分割協議証明書' : '遺産分割協議書';
+
+      const val = (id) => document.getElementById(id).value;
+
+      const makeKV = (key, value) => new Paragraph({
+        children: [
+          new TextRun({ text: key + '：　', font: 'ＭＳ 明朝' }),
+          new TextRun({ text: value || '　　　　　　', font: 'ＭＳ 明朝' }),
+        ]
+      });
+
+      const children = [
+        new Paragraph({
+          children: [new TextRun({ text: titleText, bold: true, size: 36, font: 'ＭＳ 明朝' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+        }),
+        new Paragraph({ children: [new TextRun({ text: '被相続人の表示', bold: true, font: 'ＭＳ 明朝' })], spacing: { after: 100 } }),
+        makeKV('氏　名',    val('deceasedName')),
+        makeKV('本　籍',    val('deceasedHonseki')),
+        makeKV('最後の住所', val('deceasedAddress')),
+        makeKV('生年月日',  val('deceasedDob')),
+        makeKV('死亡年月日', val('deceasedDod')),
+        new Paragraph({ text: '', spacing: { after: 200 } }),
+        new Paragraph({
+          children: [new TextRun({
+            text: isShomei
+              ? '私（証明人）は、被相続人の遺産について相続人全員による協議を行った結果、次のとおり分割することに同意したことを証明します。'
+              : '上記の者の相続人全員は、被相続人の遺産について協議を行った結果、次のとおり分割することに合意した。',
+            font: 'ＭＳ 明朝'
+          })],
+          spacing: { after: 300 },
+        }),
+      ];
+
+      /* 財産条項 */
+      let n = 1;
+      assets.forEach(asset => {
+        const hName = (asset.heirName||'').trim() || '　　　　　　';
+        const typeName = getAssetTypeName(asset.type);
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `第${n}条　相続人 ${hName} は、次の${typeName}を取得する。`, bold: true, font: 'ＭＳ 明朝' })],
+          spacing: { after: 80 },
+        }));
+
+        let bodyText = '';
+        if (asset.type === 'bank') {
+          bodyText = asset.details.info || '';
+          if ((asset.details.fractionHeir||'').trim()) {
+            bodyText += '\n※　端数が生じた場合は ' + asset.details.fractionHeir + ' が取得する。';
+          }
+        } else if (asset.type === 'car') {
+          bodyText = `登録番号：${asset.details.regNo||'　　　'}\n車台番号：${asset.details.vin||'　　　'}`;
+        } else {
+          bodyText = asset.details.info || '';
+        }
+
+        bodyText.split('\n').forEach(line => {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: '　　' + line, font: 'ＭＳ 明朝' })],
+            spacing: { after: 60 },
+          }));
+        });
+
+        children.push(new Paragraph({ text: '', spacing: { after: 160 } }));
+        n++;
+      });
+
+      /* 後日発見条項 */
+      if (document.getElementById('includeUnknownAsset').checked) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `第${n}条　後日、本協議書に記載のない新たな遺産（負債を含む。）が発見された場合には、当該遺産の分割について別途協議するものとする。`, font: 'ＭＳ 明朝' })],
+          spacing: { after: 200 }
+        }));
+        n++;
+      }
+
+      /* 死後事務費用 */
+      if (document.getElementById('includePostMortemCost').checked) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `第${n}条　相続人全員は、被相続人に係る死後事務費用（葬儀費用・遺品整理費用・賃借物件の退去費用・専門家報酬・交通費等を含む。）について均等に負担する旨合意した。`, font: 'ＭＳ 明朝' })],
+          spacing: { after: 300 }
+        }));
+      }
+
+      /* 結語 */
+      children.push(new Paragraph({
+        children: [new TextRun({
+          text: isShomei
+            ? '以上のとおり、被相続人の遺産分割協議が成立したことに相違ないことを証明するため、本書を作成し署名捺印します。'
+            : '以上のとおり、相続人全員による遺産分割協議が成立したので、本書を作成し各自署名捺印する。',
+          font: 'ＭＳ 明朝'
+        })],
+        spacing: { after: 300 },
+      }));
+
+      /* 日付 */
+      children.push(new Paragraph({
+        children: [new TextRun({ text: val('agreementDate') || '令和　　年　　月　　日', font: 'ＭＳ 明朝' })],
+        spacing: { after: 500 },
+      }));
+
+      /* 署名欄 */
+      heirs.forEach(heir => {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: '住　所　' + (heir.address || '　　　　　　　　　　　　　　'), font: 'ＭＳ 明朝' })],
+        }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text: '氏　名　' + (heir.name || '　　　　　　') + '　　　　　印', font: 'ＭＳ 明朝' })],
+          spacing: { after: 400 },
+        }));
+      });
+
+      const doc = new Document({ sections: [{ properties: {}, children }] });
+
+      Packer.toBlob(doc).then(blob => {
+        saveAs(blob, `${titleText}.docx`);
+      }).catch(e => {
+        alert('Word出力中にエラーが発生しました: ' + e.message);
+      });
+    }
+  </script>
+</body>
+</html>
